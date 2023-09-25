@@ -1,0 +1,267 @@
+clc
+clear all
+clc
+format shortg
+Ebc      = [200000000,200000000]; 
+A        = [0.001 0.001];
+EA      = [200000,200000];      % youngs modulus of bars and cables in N/mm2
+Li      = [2.0396, 2.0396];     % initial length in mm of bars and strings
+x        = [-0.4 0.4 0]';                             % coordinates of  x nodes 1 2 3 4 respectively
+y        = [0 0 2]';                                  % coordinates of  y nodes 1 2 3 4 respectively
+Coord    = [-0.4 0; 0.4 0; 0 2];                      % Element connectivity
+Coord2   = Coord;
+Elemcon  = [1 3; 3 2];
+nodes    = size(Coord,1);
+members  = size(Elemcon,1);
+dof      = 2*nodes;
+KE       = zeros(dof);           % Elastic stiffness matrix
+KG       = zeros(dof);           % Geometrical stiffness matrix            
+xnew     = [];                   % new x coordinates after loading
+ynew     = [];                   % new y coordinates after loading
+Lf       = [];                   % final length of bars and strings
+c        = [];                   % costheta direction cosines
+s        = [];                   % sintheta direction cosines                    
+D     = [0;0];
+R     = [0;0];
+Smlambda = 0.9;
+BgLambda = 0;
+Pref     = -10000;
+step=0;
+
+             PE(1,step+1) = 0;
+             lforce(1,step+1) = 0;
+             GDdiff(1,step+1)= 0;
+             ym(1,step+1)    = y(3);
+             v(1,step+1)    = D(2) ;
+             Fnet(1,step+1) = 0;
+for step=1:150
+    for i=1:members
+         n1 = Elemcon(i,1);
+         n2 = Elemcon(i,2);
+         x1 = Coord(n1,1);
+         x2 = Coord(n2,1);
+         y1 = Coord(n1,2) ;        
+         y2 = Coord(n2,2);
+         Lf(i) = sqrt((x2-x1)^2+(y2-y1)^2);
+         LS(i) = log(Lf(i)/Li(i));
+         T(i)  = EA(i)*LS(i);
+         c(i) = (x2-x1)/(Lf(i));
+         s(i) = (y2-y1)/(Lf(i));
+              ke = ((EA(i))/Li(i)).*[c(i)^2 c(i)*s(i) -c(i)^2 -c(i)*s(i) ; c(i)*s(i) s(i)^2 -c(i)*s(i) -s(i)^2 ; -c(i)^2 -c(i)*s(i) c(i)^2 c(i)*s(i) ; -c(i)*s(i) -s(i)^2 c(i)*s(i) s(i)^2];
+              kg = (T(i)/Lf(i)).*[s(i)^2 -c(i)*s(i) -s(i)^2  c(i)*s(i) ;-c(i)*s(i) c(i)^2 c(i)*s(i) -c(i)^2 ;-s(i)^2 c(i)*s(i) s(i)^2 -c(i)*s(i) ; c(i)*s(i) -c(i)^2 -c(i)*s(i) c(i)^2];
+              k1 = 2*n1-1; 
+              k2 = 2*n1;
+              k3 = 2*n2-1 ; 
+              k4 = 2*n2;
+               KE(k1:k2,k1:k2) =  KE(k1:k2,k1:k2) + ke(1:2,1:2);
+               KE(k1:k2,k3:k4) =  KE(k1:k2,k3:k4) + ke(1:2,3:4);
+               KE(k3:k4,k1:k2) =  KE(k3:k4,k1:k2) + ke(3:4,1:2);
+               KE(k3:k4,k3:k4) =  KE(k3:k4,k3:k4) + ke(3:4,3:4);
+               KG(k1:k2,k1:k2) =  KG(k1:k2,k1:k2) + kg(1:2,1:2);
+               KG(k1:k2,k3:k4) =  KG(k1:k2,k3:k4) + kg(1:2,3:4);
+               KG(k3:k4,k1:k2) =  KG(k3:k4,k1:k2) + kg(3:4,1:2);
+               KG(k3:k4,k3:k4) =  KG(k3:k4,k3:k4) + kg(3:4,3:4);
+    end                                       
+          K = KE+KG;                                 
+          kbc = K(5:6,5:6);
+          F   = [0;Pref];
+          Dcap = kbc\F;
+          Dbar = kbc\R;
+          
+          if step==1
+              GSP = 1;
+              Smlambda11=Smlambda;
+              Dcap11  = Dcap;
+              Dcapprev = Dcap;
+          end          
+          if step>1
+                 GSP = (Dcap11'*Dcap11)/(Dcapprev'*Dcap);
+                 Dcapprev = Dcap;                 
+              if GSP<0
+                 GSP=-GSP;
+                 Smlambda = -(Smlambda11*sqrt(GSP)); 
+              else                 
+              Smlambda = Smlambda11*sqrt(GSP);
+              end
+          end 
+          
+          deltaD   = (Smlambda*Dcap)+Dbar;
+          BgLambda =  BgLambda +Smlambda;
+          D        =  D + deltaD;        
+          Dx       =  [0 0 D(1)];       
+          Dy       =  [0 0 D(2)];
+             for j=1:3
+                  xnew(1,j) = Dx(j)+ Coord(j,1);  % updating x coordinates                 
+                  ynew(1,j) = Dy(j)+ Coord(j,2);  % updating y coordinates
+             end
+             Coord1 = [xnew(1) ynew(1);xnew(2) ynew(2);xnew(3) ynew(3)];
+             Coord = Coord1;
+             x = xnew;
+             y = ynew;              
+             for i=1:members
+                 n1 = Elemcon(i,1);
+                 n2 = Elemcon(i,2);
+                 x1 = Coord(n1,1);
+                 x2 = Coord(n2,1);
+                 y1 = Coord(n1,2) ;        
+                 y2 = Coord(n2,2);
+                 Lf(i) = sqrt((x2-x1)^2+(y2-y1)^2);
+                 LS(i) = log(Lf(i)/Li(i));
+                 T(i)  = EA(i)*LS(i);
+                 c(i) = (x2-x1)/(Lf(i));
+                 s(i) = (y2-y1)/(Lf(i));
+             end                
+             for i=1                                                             % Internal forces calculation in global coordinates
+               f1 = [c(i);s(i);-c(i);-s(i)]*T(i);
+             end
+             for i=2
+               f2 = [c(i);s(i);-c(i);-s(i)]*T(i);
+             end
+    
+             FintG = [f1(1); f1(2); f2(3); f2(4); f1(3)+f2(1); f1(4)+f2(2)] ;     % internal Global nodal force vector  
+             fint  = [FintG(5);FintG(6)];
+             fext  = BgLambda*F;
+             R     =  fext + fint;
+             Res   = norm(R)/norm(fext); 
+             
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+             itr =1;
+             tol = 0.0001;
+             Lambda2 = 0;
+             du2 = [0;0];
+    while Res > tol
+        for i=1:members
+         n1 = Elemcon(i,1);
+         n2 = Elemcon(i,2);
+         x1 = Coord(n1,1);
+         x2 = Coord(n2,1);
+         y1 = Coord(n1,2) ;        
+         y2 = Coord(n2,2);
+         Lf(i) = sqrt((x2-x1)^2+(y2-y1)^2);
+         LS(i) = log(Lf(i)/Li(i));
+         T(i)  = EA(i)*LS(i);
+         c(i) = (x2-x1)/(Lf(i));
+         s(i) = (y2-y1)/(Lf(i));
+              ke = ((EA(i))/Li(i)).*[c(i)^2 c(i)*s(i) -c(i)^2 -c(i)*s(i) ; c(i)*s(i) s(i)^2 -c(i)*s(i) -s(i)^2 ; -c(i)^2 -c(i)*s(i) c(i)^2 c(i)*s(i) ; -c(i)*s(i) -s(i)^2 c(i)*s(i) s(i)^2];
+              kg = (T(i)/Lf(i)).*[s(i)^2 -c(i)*s(i) -s(i)^2  c(i)*s(i) ;-c(i)*s(i) c(i)^2 c(i)*s(i) -c(i)^2 ;-s(i)^2 c(i)*s(i) s(i)^2 -c(i)*s(i) ; c(i)*s(i) -c(i)^2 -c(i)*s(i) c(i)^2];
+              k1 = 2*n1-1; 
+              k2 = 2*n1;
+              k3 = 2*n2-1 ; 
+              k4 = 2*n2;
+               KE(k1:k2,k1:k2) =  KE(k1:k2,k1:k2) + ke(1:2,1:2);
+               KE(k1:k2,k3:k4) =  KE(k1:k2,k3:k4) + ke(1:2,3:4);
+               KE(k3:k4,k1:k2) =  KE(k3:k4,k1:k2) + ke(3:4,1:2);
+               KE(k3:k4,k3:k4) =  KE(k3:k4,k3:k4) + ke(3:4,3:4);
+               KG(k1:k2,k1:k2) =  KG(k1:k2,k1:k2) + kg(1:2,1:2);
+               KG(k1:k2,k3:k4) =  KG(k1:k2,k3:k4) + kg(1:2,3:4);
+               KG(k3:k4,k1:k2) =  KG(k3:k4,k1:k2) + kg(3:4,1:2);
+               KG(k3:k4,k3:k4) =  KG(k3:k4,k3:k4) + kg(3:4,3:4);
+         end                                       
+          K = KE+KG;                                 
+          kbc = K(5:6,5:6);
+          F   = [0;Pref];
+          Dcap = kbc\F;
+          Dbar = kbc\R;
+          
+              if step==1
+                       Smlambda = -((Dcap11'*Dbar)/(Dcap11'*Dcap));
+               else
+                       Smlambda = -((Dcapprev'*Dbar)/(Dcapprev'*Dcap));
+              end
+              
+          du2      = (Smlambda*Dcap)+Dbar;
+          Lambda2  =  Lambda2 +Smlambda;
+          Dins      =  D + du2;        
+          Dx       =  [0 0 Dins(1)];       
+          Dy       =  [0 0 Dins(2)];
+             for j=1:3
+                  xnew(1,j) = Dx(j)+ Coord(j,1);  % updating x coordinates                 
+                  ynew(1,j) = Dy(j)+ Coord(j,2);  % updating y coordinates
+             end
+             Coord1 = [xnew(1) ynew(1);xnew(2) ynew(2);xnew(3) ynew(3)];
+             Coord = Coord1;
+             x = xnew;
+             y = ynew;              
+             for i=1:members
+                 n1 = Elemcon(i,1);
+                 n2 = Elemcon(i,2);
+                 x1 = Coord(n1,1);
+                 x2 = Coord(n2,1);
+                 y1 = Coord(n1,2) ;        
+                 y2 = Coord(n2,2);
+                 Lf(i) = sqrt((x2-x1)^2+(y2-y1)^2);
+                 LS(i) = log(Lf(i)/Li(i));
+                 T(i)  = EA(i)*LS(i);
+                 c(i) = (x2-x1)/(Lf(i));
+                 s(i) = (y2-y1)/(Lf(i));
+             end                
+             for i=1                                                             % Internal forces calculation in global coordinates
+               f1 = [c(i);s(i);-c(i);-s(i)]*T(i);
+             end
+             for i=2
+               f2 = [c(i);s(i);-c(i);-s(i)]*T(i);
+             end
+    
+             FintG = [f1(1); f1(2); f2(3); f2(4); f1(3)+f2(1); f1(4)+f2(2)] ;     % internal Global nodal force vector  
+             fint  = [FintG(5);FintG(6)];
+             fext  = (BgLambda+Lambda2)*F;
+             R     = fext + fint;
+             Res   = norm(R)/norm(fext);
+             itr   = itr+1;
+    end    
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%            
+             BgLambda = BgLambda + Lambda2;
+             Fext     = BgLambda*F;
+             D        = D + du2;                                  
+
+             vx     = [0 0 D(1)];       
+             vy     = [0 0 D(2)];
+             for j=1:3
+                  xnew(1,j) = vx(j)+ Coord2(j,1);                 
+                  ynew(1,j) = vy(j)+ Coord2(j,2);  
+             end
+             Coord1 = [xnew(1) ynew(1);xnew(2) ynew(2);xnew(3) ynew(3)];
+             Coord = Coord1;
+             x = xnew;
+             y = ynew;
+             for i=1:members
+                 n1 = Elemcon(i,1);
+                 n2 = Elemcon(i,2);
+                 x1 = Coord(n1,1);
+                 x2 = Coord(n2,1);
+                 y1 = Coord(n1,2) ;        
+                 y2 = Coord(n2,2);
+                 lf(i) = sqrt((x2-x1)^2+(y2-y1)^2);
+                 lS(i) = log(lf(i)/Li(i));
+                 t(i)  = EA(i)*lS(i);
+                 si(i) = (y2-y1)/(lf(i));
+                 sigma(i) =  Ebc(i)*lS(i);      % True stress        
+                 UE(i)    =  (0.5*sigma(i)^2*A(i)*lf(i))/Ebc(i);  % Strain Energy of memeber
+             end
+             SE = UE(1)+UE(2);
+             Dis = [D(1); D(2)];
+             WD  = (Fext'*Dis);
+             PE(1,step+1) =  SE;
+             Ldis= lf(1)-Li(1);
+             lforce(1,step+1) =  (2*t(1)*si(1)/1000);
+             GDdiff(1,step+1)= sqrt((2.0396+Ldis)^2-0.4^2) - sqrt(Li(1)^2-0.4^2);
+             ym(1,step+1)    = ynew(3);
+             v(1,step+1)    = D(2) ;
+             Fnet(1,step+1) = Fext(2);
+             
+end
+            
+Fnet;
+v;
+GDdiff;
+ym;
+hold on
+plot(-v,PE,'Linewidth',3,'color','b')
+ ylabel('Elastic Energy')
+ xlabel('Displacement')
+ disp('(Global Force)      (Calculated Global Force)     (Delta Global)    (Delta CC'')   (Y Coordinate of Node C)')
+disp('==========================================================================================')
+fprintf(' %12.2f  %15.4f    %21.3f    %16.3f    %19.4f\n' , [Fnet;lforce;v;GDdiff;ym])
+
+  
