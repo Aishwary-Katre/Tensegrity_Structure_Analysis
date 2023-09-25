@@ -1,0 +1,83 @@
+clc
+clear all
+clc
+nodes = 6;
+d =3;
+C = [ 0 1 -1 0 0 0; 1 0 -1 0 0 0; 1 -1 0 0 0 0; 0 0 0 0 1 -1; 0 0 0 1 0 -1; 0 0 0 1 -1 0; 1 0 0 0 -1 0; 0 1 0 0 0 -1; 0 0 1 -1 0 0; 1 0 0 -1 0 0; 0 1 0 0 -1 0; 0 0 1 0 0 -1];
+B1 = [0 1 1 0 0 0 1 0 0 1 0 0  ;  0 0 -1 0 0 0 0 0 0 0 0 0  ; 0 -1 0 0 0 0 0 0 0 0 0 0 ; 0 0 0 0 0 0 0 0 0 -1 0 0  ; 0 0 0 0 0 0 -1 0 0 0 0 0  ; 0 0 0 0 0 0 0 0 0 0 0 0];
+B2 = [0 0 -1 0 0 0 0 0 0 0 0 0  ; 1 0 1 0 0 0 0 1 0 0 1 0  ; -1 0 0 0 0 0 0 0 0 0 0 0 ;  0 0 0 0 0 0 0 0 0 0 0 0  ;  0 0 0 0 0 0 0 0 0 0 -1 0 ;  0 0 0 0 0 0 0 -1 0 0 0 0];
+B3 = [0 -1 0 0 0 0 0 0 0 0 0 0  ; -1 0 0 0 0 0 0 0 0 0 0 0  ; 1 1 0 0 0 0 0 0 1 0 0 1  ; 0 0 0 0 0 0 0 0 -1 0 0 0 ;  0 0 0 0 0 0 0 0 0 0 0 0  ;  0 0 0 0 0 0 0 0 0 0 0 -1];
+B4=  [0 0 0 0 0 0 0 0 0 -1 0 0  ; 0 0 0 0 0 0 0 0 0 0 0 0  ; 0 0 0 0 0 0 0 0 -1 0 0 0  ; 0 0 0 0 1 1 0 0 1 1 0 0  ; 0 0 0 0 0 -1 0 0 0 0 0 0  ;  0 0 0 0 -1 0 0 0 0 0 0 0];
+B5 = [0 0 0 0 0 0 -1 0 0 0 0 0  ; 0 0 0 0 0 0 0 0 0 0 -1 0 ; 0 0 0 0 0 0 0 0 0 0 0 0  ;  0 0 0 0 0 -1 0 0 0 0 0 0  ; 0 0 0 1 0 1 1 0 0 0 1 0  ;  0 0 0 -1 0 0 0 0 0 0 0 0];
+B6 = [0 0 0 0 0 0 0 0 0 0 0 0  ; 0 0 0 0 0 0 0 -1 0 0 0 0  ; 0 0 0 0 0 0 0 0 0 0 0 -1  ; 0 0 0 0 -1 0 0 0 0 0 0 0  ; 0 0 0 -1 0 0 0 0 0 0 0 0  ;  0 0 0 1 1 0 0 1 0 0 0 1];
+B = [B1;B2;B3;B4;B5;B6];
+count = 0;
+rankdef =0;
+q = [1 1 1 1 1 1 2 2 2 -1 -1 -1];
+h = d+1;
+ while rankdef ~= h
+Q = diag(q);
+E = C'*Q*C;
+[V, lambda] = eig(E);
+%  sortlam = diag(lambda);
+  for i=1:nodes-2
+      lambda(i,i) = 0;
+  end
+% newlam = diag(sortlam);
+Ebar = V*lambda*V';
+gbar = [Ebar(1,:)';Ebar(2,:)';Ebar(3,:)';Ebar(4,:)';Ebar(5,:)';Ebar(6,:)'];
+% qbar = lsqr(B,gbar);
+qbar = ((B'*B)\B')*gbar;
+Qbar = diag(qbar);
+Enxt = C'*Qbar*C;
+Rn = rank(Enxt);
+rankdef1= nodes-Rn;
+rankdef = rankdef1;
+q = qbar;
+Efinal = Enxt
+qfinal = qbar
+count  = count+1
+ end 
+%  % plotting and geometry realization
+I = eye(3);
+H = kron(I,Efinal);
+A = null(H,"rational");
+RR = rref(A');
+Abr = [A(1:4,:);A(7:10,:);A(13:16,:)];
+Xbr = [-10 5 5 -5 0 -8 8 0 5 5 5 -5]';
+X = (A*inv(Abr))*Xbr;
+x = [X(1:6)]';
+y = [X(7:12)]';
+z = [X(13:18)]';
+% % Plotting
+ hold all
+ grid on
+ view(90,80) % Azimuth and elevation view
+% closing the triangle
+Xc = [x(1:3),x(1)];
+Yc = [y(1:3),y(1)];
+Zc = [z(1:3),z(1)];
+Xcd = [x(4:6),x(4)];
+Ycd = [y(4:6),y(4)];
+Zcd = [z(4:6),z(4)];
+plot3(Xc,Yc,Zc,'Color','b','LineWidth',4) % greenfor cables
+plot3(Xcd,Ycd,Zcd,'Color','b','LineWidth',4) % greenfor cables
+% % preparing coordinates for bracing cables and struts and nodal numbering
+Xb = [x(1) x(6); x(2) x(4); x(3) x(5)];
+Yb = [y(1) y(6); y(2) y(4); y(3) y(5)];
+Zb = [z(1) z(6); z(2) z(4); z(3) z(5)];
+Xs = [x(1) x(4); x(2) x(5); x(3) x(6)];
+Ys = [y(1) y(4); y(2) y(5); y(3) y(6)];
+Zs = [z(1) z(4); z(2) z(5); z(3) z(6)];
+% % drawing bracing cables and struts and nodal numbering
+for i = 1:3
+plot3(Xb(i,:),Yb(i,:),Zb(i,:),'Color','g','LineWidth',2) %bracings
+plot3(Xs(i,:),Ys(i,:),Zs(i,:),'Color','r','LineWidth',5) %struts
+scatter3([x(i) x(i+3)],[y(i) y(i+3)],[z(i) z(i+3)],'filled'),...'MarkerFaceColor','k')
+text(x(i),y(i),z(i),[' ' num2str(i)],'HorizontalAlignment','left','FontSize',20)
+text(x(i+3),y(i+3),z(i+3),[' ' num2str(i) ''''],'HorizontalAlignment','left','FontSize',20)
+
+end
+xlabel('xaxis')
+ylabel('yaxis')
+zlabel('zaxis')
