@@ -1,0 +1,64 @@
+clear all
+clc
+d =2;
+Coord = [-1 1 ; 1 1 ; -1 -1 ; 1 -1];   %Coordinates
+Elemcon = [1 4; 2 3; 3 4; 1 3; 1 2; 2 4]; %Element connectivity
+nodes = size(Coord,1);
+members = size(Elemcon,1);
+C = [1 0 0 -1; 0 1 -1 0; 0 0 1 -1; 1 0 -1 0; 1 -1 0 0; 0 1 0 -1];   %Connectivity matrix
+B1 = [1 0 0 1 1 0  ;  0 0 0 0 -1 0  ;  0 0 0 -1 0 0  ;  -1 0 0 0 0 0];
+B2 = [0 0 0 0 -1 0 ; 0 1 0 0 1 1   ;  0 -1 0 0 0 0  ;  0 0 0 0 0 -1];
+B3 = [0 0 0 -1 0 0  ;  0 -1 0 0 0 0  ;  0 1 1 1 0 0  ;  0 0 -1 0 0 0];
+B4 = [-1 0 0 0 0 0  ;  0 0 0 0 0 -1  ;  0 0 -1 0 0 0  ; 1 0 1 0 0 1];
+B = [B1;B2;B3;B4];
+count = 0;
+rankdef =0;
+q = [-1 -1 0.5 0.5 0.5 0.5];    %Force density
+nodes = 4;
+h = d+1;
+while rankdef ~= h
+    Q = diag(q);
+    E = C'*Q*C;
+   [V, lambda] = eig(E);
+  for i=1:(nodes-1)
+     lambda(i,i)=0;
+  end
+Ebar = V*lambda*V';
+gbar = [Ebar(1,:)';Ebar(2,:)';Ebar(3,:)';Ebar(4,:)'];
+ qbar = inv(B'*B)*B'*gbar;
+ Qbar = diag(qbar);
+ Enxt = C'*Qbar*C;
+ Rn  = rank(Enxt);
+ rankdef1= nodes-Rn;
+ rankdef = rankdef1;
+ q = qbar;
+ Efinal = Enxt;
+ qfinal = qbar
+ count  = count+1;
+end
+%%%%%%%%%%%%   Geometry Realization   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+I = eye(2);
+H = kron(I,Efinal);
+A = null(H,"rational");
+RR = rref(A');
+Abr = [A(1:3,:);A(5:7,:)];
+Xbr = [-10 2 1 4 1 -2]';
+X = (A*inv(Abr))*Xbr;
+x = [X(1:4)]';
+y = [X(5:8)]';
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  Plotting  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ hold all
+ grid on
+Xc = [x(1:2),x(4),x(3),x(1)];
+Yc = [y(1:2),y(4),y(3),y(1)];
+plot(Xc,Yc,'Color','b','LineWidth',4) % blue for cables
+Xb = [x(1),x(4)];
+Yb = [y(1),y(4)];
+plot(Xb,Yb,'Color','r','Linewidth',4)
+Xg =[x(2),x(3)];
+Yg =[y(2),y(3)];
+plot(Xg,Yg,'Color','r','Linewidth',4)
+str = string(1:4);
+text(x,y,str,'FontSize',30)
+xlabel('xaxis')
+ylabel('yaxis')
