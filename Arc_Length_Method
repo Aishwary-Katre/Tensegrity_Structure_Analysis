@@ -1,0 +1,273 @@
+clc
+clear all
+clc
+format shortg
+EA       = [200000,200000]; 
+A        = [0.001 0.001];
+Ebc      = [200000000,200000000];   
+Li       = [2.0396, 2.0396];     
+x        = [-0.4 0.4 0]';                             % coordinates of  x nodes 1 2 3 4 respectively
+y        = [0 0 2]';                                  % coordinates of  y nodes 1 2 3 4 respectively
+Coord    = [-0.4 0; 0.4 0; 0 2];                      % Element connectivity
+Coordinitial   = Coord;
+Elemcon  = [1 3; 2 3];
+nodes    = size(Coord,1);
+members  = size(Elemcon,1);
+dof      = 2*nodes;
+KE       = zeros(dof);           % Elastic stiffness matrix
+KG       = zeros(dof);           % Geometrical stiffness matrix            
+xnew     = [];                   % new x coordinates after loading
+ynew     = [];                   % new y coordinates after loading
+Lf       = [];                   % final length of bars and strings
+c        = [];                   % costheta direction cosines
+s        = [];
+deltaUprev  = [1;-1];
+Pref     = -10000;
+Lambda   = 0;
+D        = [0;0];
+F        = [0;Pref];
+deltaS   = 0.1;
+etta     = 0;
+step=0;
+             PE(1,step+1) = 0;
+             lforce(1,step+1) = 0;
+             GDdiff(1,step+1)= 0;
+             ym(1,step+1)    = y(3);
+             v(1,step+1)     = D(2) ;
+             Fnet(1,step+1) = 0;
+ for step=1:50
+               for i=1:members
+                   n1 = Elemcon(i,1);
+                   n2 = Elemcon(i,2);
+                   x1 = Coord(n1,1);
+                   x2 = Coord(n2,1);
+                   y1 = Coord(n1,2) ;        
+                   y2 = Coord(n2,2);
+                   Lf(i) = sqrt((x2-x1)^2+(y2-y1)^2);
+                   c(i) = (x2-x1)/(Lf(i));
+                   s(i) = (y2-y1)/(Lf(i));
+                   LS(i) = log(Lf(i)/Li(i));
+                   T(i)  = EA(i)*LS(i);
+                   ke = ((EA(i))/Li(i)).*[c(i)^2 c(i)*s(i) -c(i)^2 -c(i)*s(i) ; c(i)*s(i) s(i)^2 -c(i)*s(i) -s(i)^2 ; -c(i)^2 -c(i)*s(i) c(i)^2 c(i)*s(i) ; -c(i)*s(i) -s(i)^2 c(i)*s(i) s(i)^2];
+                   kg = (T(i)/Li(i)).*[s(i)^2 -c(i)*s(i) -s(i)^2  c(i)*s(i) ;-c(i)*s(i) c(i)^2 c(i)*s(i) -c(i)^2 ;-s(i)^2 c(i)*s(i) s(i)^2 -c(i)*s(i) ; c(i)*s(i) -c(i)^2 -c(i)*s(i) c(i)^2];
+                   k1 = 2*n1-1; 
+                   k2 = 2*n1;
+                   k3 = 2*n2-1 ; 
+                   k4 = 2*n2;
+                  KE(k1:k2,k1:k2) =  KE(k1:k2,k1:k2) + ke(1:2,1:2);
+                  KE(k1:k2,k3:k4) =  KE(k1:k2,k3:k4) + ke(1:2,3:4);
+                  KE(k3:k4,k1:k2) =  KE(k3:k4,k1:k2) + ke(3:4,1:2);
+                  KE(k3:k4,k3:k4) =  KE(k3:k4,k3:k4) + ke(3:4,3:4);
+                  KG(k1:k2,k1:k2) =  KG(k1:k2,k1:k2) + kg(1:2,1:2);
+                  KG(k1:k2,k3:k4) =  KG(k1:k2,k3:k4) + kg(1:2,3:4);
+                  KG(k3:k4,k1:k2) =  KG(k3:k4,k1:k2) + kg(3:4,1:2);
+                  KG(k3:k4,k3:k4) =  KG(k3:k4,k3:k4) + kg(3:4,3:4);
+               end
+        
+                   K = KE+KG;
+                   KS = K(5:6,5:6);
+                   Ucap = KS\F;                 
+             deltalambda = (deltaS)/(sqrt(Ucap'*Ucap +etta));
+             sign   = deltaUprev'*Ucap;
+              if sign<0
+                   deltalambda = -deltalambda;
+              else
+                   deltalambda = deltalambda;
+              end
+                  
+             Lambda  = Lambda + deltalambda;        
+             deltaD  = deltalambda*Ucap;
+             D      = D+deltaD;
+             Dx     = [0 0 D(1)];       
+             Dy     = [0 0 D(2)];
+             for j=1:3
+                  xnew(1,j) = Dx(j)+ Coord(j,1);  % updating x coordinates                 
+                  ynew(1,j) = Dy(j)+ Coord(j,2);  % updating y coordinates
+             end
+             Coord1 = [xnew(1) ynew(1);xnew(2) ynew(2);xnew(3) ynew(3)];
+             Coord = Coord1;
+             x = xnew;
+             y = ynew;             
+            for i=1:members
+                 n1 = Elemcon(i,1);
+                 n2 = Elemcon(i,2);
+                 x1 = Coord(n1,1);
+                 x2 = Coord(n2,1);
+                 y1 = Coord(n1,2) ;        
+                 y2 = Coord(n2,2);
+                 Lf(i) = sqrt((x2-x1)^2+(y2-y1)^2);
+                 LS(i) = log(Lf(i)/Li(i));
+                 T(i)  = EA(i)*LS(i);
+                 c(i) = (x2-x1)/(Lf(i));
+                 s(i) = (y2-y1)/(Lf(i));
+            end 
+             for i=1                                                            
+               f1 = [c(i);s(i);-c(i);-s(i)]*T(i);
+             end
+             for i=2
+               f2 = [c(i);s(i);-c(i);-s(i)]*T(i);
+             end
+             FintG = [f1(1); f1(2); f2(1); f2(2); f1(3)+f2(3); f1(4)+f2(4)] ;    
+             fint  = [FintG(5);FintG(6)];
+             fext  = Lambda*F;
+             R     = fext+fint;
+             Res  = norm(R)/norm(fext);
+             
+                       
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+ 
+             k   = 0;
+             tol = 0.0001;
+             dellambda = 0;
+             delU = [0;0];
+ while   Res>tol
+                
+                   for i=1:members
+                   n1 = Elemcon(i,1);
+                   n2 = Elemcon(i,2);
+                   x1 = Coord(n1,1);
+                   x2 = Coord(n2,1);
+                   y1 = Coord(n1,2) ;        
+                   y2 = Coord(n2,2);
+                   Lf(i) = sqrt((x2-x1)^2+(y2-y1)^2);
+                   c(i) = (x2-x1)/(Lf(i));
+                   s(i) = (y2-y1)/(Lf(i));
+                   LS(i) = log(Lf(i)/Li(i));
+                   T(i)  = EA(i)*LS(i);
+                   ke = ((EA(i))/Li(i)).*[c(i)^2 c(i)*s(i) -c(i)^2 -c(i)*s(i) ; c(i)*s(i) s(i)^2 -c(i)*s(i) -s(i)^2 ; -c(i)^2 -c(i)*s(i) c(i)^2 c(i)*s(i) ; -c(i)*s(i) -s(i)^2 c(i)*s(i) s(i)^2];
+                   kg = (T(i)/Li(i)).*[s(i)^2 -c(i)*s(i) -s(i)^2  c(i)*s(i) ;-c(i)*s(i) c(i)^2 c(i)*s(i) -c(i)^2 ;-s(i)^2 c(i)*s(i) s(i)^2 -c(i)*s(i) ; c(i)*s(i) -c(i)^2 -c(i)*s(i) c(i)^2];
+                   k1 = 2*n1-1; 
+                   k2 = 2*n1;
+                   k3 = 2*n2-1 ; 
+                   k4 = 2*n2;
+                  KE(k1:k2,k1:k2) =  KE(k1:k2,k1:k2) + ke(1:2,1:2);
+                  KE(k1:k2,k3:k4) =  KE(k1:k2,k3:k4) + ke(1:2,3:4);
+                  KE(k3:k4,k1:k2) =  KE(k3:k4,k1:k2) + ke(3:4,1:2);
+                  KE(k3:k4,k3:k4) =  KE(k3:k4,k3:k4) + ke(3:4,3:4);
+                  KG(k1:k2,k1:k2) =  KG(k1:k2,k1:k2) + kg(1:2,1:2);
+                  KG(k1:k2,k3:k4) =  KG(k1:k2,k3:k4) + kg(1:2,3:4);
+                  KG(k3:k4,k1:k2) =  KG(k3:k4,k1:k2) + kg(3:4,1:2);
+                  KG(k3:k4,k3:k4) =  KG(k3:k4,k3:k4) + kg(3:4,3:4);
+                   end                
+                   K = KE+KG;
+                
+                   KS = K(5:6,5:6);
+                   Ucap = KS\F;
+                   Ubar = KS\R;
+                   
+                   deltaU  =  deltaD + delU;
+                   aa        = Ucap'*Ucap;
+                   bb        = 2*(deltaU  + Ubar )'*Ucap;
+                   cc        = ((deltaU  + Ubar)'*(deltaU  + Ubar))-deltaS^2;
+                   lambda1  = (-bb+(sqrt(bb^2-4*aa*cc)))/(2*aa);
+                   lambda2  = (-bb-(sqrt(bb^2-4*aa*cc)))/(2*aa);
+                   dot1     = (deltaU +Ubar+lambda1*Ucap)'*deltaU ;
+                   dot2     = (deltaU +Ubar+lambda2*Ucap)'*deltaU ;
+                   if dot1 >= dot2
+                       dellambda = dellambda+lambda1;
+                       delU      = delU+ Ubar + lambda1*Ucap;
+                   else
+                       dellambda = dellambda+lambda2;
+                       delU      = delU+ Ubar + lambda2*Ucap;
+                   end
+                           
+                   Dins     = D + delU;
+                   Ux       = [0 0 Dins(1)];       
+                   Uy       = [0 0 Dins(2)];
+             for j=1:3
+                  xnew(1,j) = Ux(j)+ Coord(j,1);  % updating x coordinates                 
+                  ynew(1,j) = Uy(j)+ Coord(j,2);  % updating y coordinates
+             end
+             CoordInside = [xnew(1) ynew(1);xnew(2) ynew(2);xnew(3) ynew(3)];
+             Coord =  CoordInside;
+             x = xnew;
+             y = ynew;
+            for i=1:members
+                 n1 = Elemcon(i,1);
+                 n2 = Elemcon(i,2);
+                 x1 = Coord(n1,1);
+                 x2 = Coord(n2,1);
+                 y1 = Coord(n1,2) ;        
+                 y2 = Coord(n2,2);
+                 Lf(i) = sqrt((x2-x1)^2+(y2-y1)^2);
+                 LS(i) = log(Lf(i)/Li(i));
+                 T(i)  = EA(i)*LS(i);
+                 c(i) = (x2-x1)/(Lf(i));
+                 s(i) = (y2-y1)/(Lf(i));
+            end
+           
+             for i=1                                                              % Internal forces calculation in global coordinates
+               f1 = [c(i);s(i);-c(i);-s(i)]*T(i);
+             end
+             for i=2
+               f2 = [c(i);s(i);-c(i);-s(i)]*T(i);
+             end
+             FintG = [f1(1); f1(2); f2(1); f2(2); f1(3)+f2(3); f1(4)+f2(4)] ;      % internal Global nodal force vector  
+             fint  = [FintG(5);FintG(6)];
+             fext  = (Lambda+dellambda)*F;
+             R     = fext+fint;
+             Res   = norm(R)/norm(fext);
+             k = k+1; 
+        
+ end
+
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+             deltaUprev = deltaD + delU;
+             Lambda = Lambda + dellambda;
+             Fext   = Lambda*F;
+             D      = D + delU;
+             vx     = [0 0 D(1)];       
+             vy     = [0 0 D(2)];
+             for j=1:3
+                  xnew(1,j) = vx(j)+ Coordinitial(j,1);  % updating x coordinates                 
+                  ynew(1,j) = vy(j)+ Coordinitial(j,2);  % updating y coordinates
+             end
+             Coord1 = [xnew(1) ynew(1);xnew(2) ynew(2);xnew(3) ynew(3)];
+             Coord = Coord1;
+             x = xnew;
+             y = ynew;
+          
+             for i=1:members
+                 n1 = Elemcon(i,1);
+                 n2 = Elemcon(i,2);
+                 x1 = Coord(n1,1);
+                 x2 = Coord(n2,1);
+                 y1 = Coord(n1,2) ;        
+                 y2 = Coord(n2,2);
+                 lf(i) = sqrt((x2-x1)^2+(y2-y1)^2);
+                 lS(i) = log(lf(i)/Li(i));
+                 t(i)  = EA(i)*lS(i);
+                 c(i) = (x2-x1)/(lf(i));
+                 si(i) = (y2-y1)/(lf(i));
+                 sigma(i) =  Ebc(i)*lS(i);                           
+                 UE(i)    =  (0.5*sigma(i)^2*A(i)*lf(i))/Ebc(i); 
+             end
+             SE = UE(1)+UE(2);
+             Dis = [D(1); D(2)];
+             WD  = (Fext'*Dis);
+             PE(1,step+1) =  SE;
+             Ldis= lf(1)-Li(1);
+             lforce(1,step+1) =  (2*t(1)*si(1)/1000);
+             GDdiff(1,step+1)= sqrt((2.0396+Ldis)^2-0.4^2) - sqrt(Li(1)^2-0.4^2);
+             ym(1,step+1)    = ynew(3);
+             v(1,step+1)    = D(2) ;
+             Fnet(1,step+1) = Fext(2);
+                          
+ end  
+ 
+Fnet;
+v;
+GDdiff;
+ym;
+plot(-v,PE,'Linewidth',3,'color','b')
+grid on
+ ylabel('Strain Energy')
+ xlabel('Displacement')
+ disp('(Calculated Global Force)     (Delta Global)    (Delta CC'')   (Y Coordinate of Node C)')
+disp('==========================================================================================')
+fprintf(' %12.3f    %21.3f    %16.3f    %19.5f\n' , [PE;v;GDdiff;ym])
+
+ 
